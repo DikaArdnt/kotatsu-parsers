@@ -129,7 +129,7 @@ internal class BatCave(context: MangaLoaderContext) :
 				branch = null,
 				volume = 0,
 			)
-		}
+		}.reversed()
 
 		val author = doc.selectFirst("li:contains(Publisher:)")
 			?.textOrNull()

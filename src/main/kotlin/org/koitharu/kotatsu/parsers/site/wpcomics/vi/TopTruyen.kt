@@ -12,9 +12,9 @@ import java.util.*
 
 @MangaSourceParser("TOPTRUYEN", "TopTruyen", "vi")
 internal class TopTruyen(context: MangaLoaderContext) :
-	WpComicsParser(context, MangaParserSource.TOPTRUYEN, "www.toptruyentv6.pro", 36) {
+	WpComicsParser(context, MangaParserSource.TOPTRUYEN, "www.toptruyentv7.pro", 36) {
 
-	override val configKeyDomain = ConfigKey.Domain("www.toptruyentv6.pro")
+      override val configKeyDomain = ConfigKey.Domain("www.toptruyentv8.com", "www.toptruyentv7.pro")
 
 	override val datePattern = "dd/MM/yyyy"
 
@@ -228,6 +228,8 @@ internal class TopTruyen(context: MangaLoaderContext) :
 				url.contains("image_default.png") ||
 				url.contains("toptruyentv5.jpg") ||
 				url.contains("toptruyentv6.jpg") ||
+				url.contains("toptruyentv7.jpg") ||
+                        url.contains("toptruyentv8.jpg") ||
 				url.contains("img_001_1743221470.png")) { // Remove ads images
 				return@mapNotNull null
 			}

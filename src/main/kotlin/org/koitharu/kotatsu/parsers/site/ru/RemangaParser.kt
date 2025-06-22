@@ -38,7 +38,7 @@ internal class RemangaParser(
 
 	override fun getRequestHeaders() = getApiHeaders()
 
-	override val configKeyDomain = ConfigKey.Domain("remanga.org", "реманга.орг")
+	override val configKeyDomain = ConfigKey.Domain("remanga.me", "remanga.org", "реманга.орг")
 
 	override val authUrl: String
 		get() = "https://${domain}"
@@ -50,12 +50,11 @@ internal class RemangaParser(
 		SortOrder.NEWEST,
 	)
 
-	override val isAuthorized: Boolean
-		get() {
-			return context.cookieJar.getCookies(domain).any {
-				it.name == "user"
-			}
+	override suspend fun isAuthorized(): Boolean {
+		return context.cookieJar.getCookies(domain).any {
+			it.name == "user"
 		}
+	}
 
 	private val regexLastUrlPath = Regex("/[^/]+/?$")
 
@@ -113,8 +112,8 @@ internal class RemangaParser(
 				title = jo.getString("rus_name"),
 				altTitles = setOfNotNull(jo.getStringOrNull("en_name")),
 				rating = jo.getString("avg_rating").toFloatOrNull()?.div(10f) ?: RATING_UNKNOWN,
-				coverUrl = "https://api.$domain${img.getString("mid")}",
-				largeCoverUrl = "https://api.$domain${img.getString("high")}",
+				coverUrl = img.getStringOrNull("mid")?.toAbsoluteUrl("api.$domain"),
+				largeCoverUrl = img.getStringOrNull("high")?.toAbsoluteUrl("api.$domain"),
 				authors = emptySet(),
 				contentRating = null,
 				state = null,

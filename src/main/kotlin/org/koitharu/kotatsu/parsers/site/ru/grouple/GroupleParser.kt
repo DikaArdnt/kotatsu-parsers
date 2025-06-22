@@ -74,8 +74,7 @@ internal abstract class GroupleParser(
 			return "https://grouple.co/internal/auth/sso?siteId=$siteId&=targetUri=$targetUri"
 		}
 
-	override val isAuthorized: Boolean
-		get() = context.cookieJar.getCookies(domain).any { it.name == "gwt" }
+	override suspend fun isAuthorized(): Boolean = hasAuthCookie()
 
 	override val filterCapabilities: MangaListFilterCapabilities
 		get() = MangaListFilterCapabilities(
@@ -457,9 +456,15 @@ internal abstract class GroupleParser(
 			val page = pages.getJSONArray(i)
 			val primaryServer = page.getString(0)
 			val url = page.getString(2)
+			val fullSrc = if ("$primaryServer|$serversStr|$url".contains("one-way.work")) {
+				// domain that does not need a token
+				"$primaryServer|$serversStr|${url}".substringBefore("?")
+			} else {
+				"$primaryServer|$serversStr|$url"
+			}
 			MangaPage(
 				id = generateUid(url),
-				url = "$primaryServer|$serversStr|$url",
+				url = fullSrc,
 				preview = null,
 				source = source,
 			)
@@ -479,9 +484,15 @@ internal abstract class GroupleParser(
 			val page = pages.getJSONArray(i)
 			val primaryServer = page.getString(0)
 			val url = page.getString(2)
+			val fullSrc = if ("$primaryServer|$serversStr|$url".contains("one-way.work")) {
+				// domain that does not need a token
+				"$primaryServer|$serversStr|${url}".substringBefore("?")
+			} else {
+				"$primaryServer|$serversStr|$url"
+			}
 			MangaPage(
 				id = generateUid(url),
-				url = "$primaryServer|$serversStr|$url",
+				url = fullSrc,
 				preview = null,
 				source = source,
 			)
@@ -494,9 +505,15 @@ internal abstract class GroupleParser(
 			val ja = json.getJSONArray(i)
 			val server = ja.getString(0).ifEmpty { "https://$domain" }
 			val url = ja.getString(2)
+			val fullUrl = concatUrl(server, url)
 			MangaPage(
 				id = generateUid(url),
-				url = concatUrl(server, url),
+				url = if (fullUrl.contains("one-way.work")) {
+					// domain that does not need a token
+					fullUrl.substringBefore("?")
+				} else {
+					fullUrl
+				},
 				preview = null,
 				source = source,
 			)
@@ -538,7 +555,7 @@ internal abstract class GroupleParser(
 			throw AuthRequiredException(source)
 		}
 		if (code == HttpURLConnection.HTTP_NOT_FOUND) {
-			if (!isAuthorized) {
+			if (!hasAuthCookie()) {
 				closeQuietly()
 				throw AuthRequiredException(source)
 			} else {
@@ -547,4 +564,6 @@ internal abstract class GroupleParser(
 		}
 		return this
 	}
+
+	private fun hasAuthCookie() = context.cookieJar.getCookies(domain).any { it.name == "gwt" }
 }

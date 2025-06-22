@@ -82,12 +82,11 @@ internal abstract class MadaraParser(
 	override val authUrl: String
 		get() = "https://${domain}"
 
-	override val isAuthorized: Boolean
-		get() {
-			return context.cookieJar.getCookies(domain).any {
-				it.name.contains("wordpress_logged_in")
-			}
+	override suspend fun isAuthorized(): Boolean {
+		return context.cookieJar.getCookies(domain).any {
+			it.name.contains("wordpress_logged_in")
 		}
+	}
 
 	override suspend fun getUsername(): String {
 		val body = webClient.httpGet("https://${domain}/").parseHtml().body()
@@ -535,6 +534,14 @@ internal abstract class MadaraParser(
 	protected open val selectAlt =
 		".post-content_item:contains(Alt) .summary-content, .post-content_item:contains(Nomes alternativos: ) .summary-content"
 
+	protected open fun createMangaTag(a: Element): MangaTag? {
+		return MangaTag(
+			key = a.attr("href").removeSuffix("/").substringAfterLast('/'),
+			title = a.text().toTitleCase(),
+			source = source,
+		)
+	}
+
 	override suspend fun getDetails(manga: Manga): Manga = coroutineScope {
 		val fullUrl = manga.url.toAbsoluteUrl(domain)
 		val doc = webClient.httpGet(fullUrl).parseHtml()
@@ -567,13 +574,7 @@ internal abstract class MadaraParser(
 			title = doc.selectFirst("h1")?.textOrNull() ?: manga.title,
 			url = href,
 			publicUrl = href.toAbsoluteUrl(domain),
-			tags = doc.body().select(selectGenre).mapToSet { a ->
-				MangaTag(
-					key = a.attr("href").removeSuffix("/").substringAfterLast('/'),
-					title = a.text().toTitleCase(),
-					source = source,
-				)
-			},
+			tags = doc.body().select(selectGenre).mapToSet { a -> createMangaTag(a) }.filterNotNull().toSet(),
 			description = desc,
 			altTitles = setOfNotNull(alt),
 			state = state,
@@ -615,11 +616,13 @@ internal abstract class MadaraParser(
 		}
 	}
 
+	protected open val postDataReq = "action=manga_get_chapters&manga="
+
 	protected open suspend fun loadChapters(mangaUrl: String, document: Document): List<MangaChapter> {
 		val doc = if (postReq) {
 			val mangaId = document.select("div#manga-chapters-holder").attr("data-id")
 			val url = "https://$domain/wp-admin/admin-ajax.php"
-			val postData = "action=manga_get_chapters&manga=$mangaId"
+			val postData = postDataReq + mangaId
 			webClient.httpPost(url, postData).parseHtml()
 		} else {
 			val url = mangaUrl.toAbsoluteUrl(domain).removeSuffix('/') + "/ajax/chapters/"
