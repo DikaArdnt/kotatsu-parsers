@@ -1,29 +1,25 @@
 package org.koitharu.kotatsu.parsers.site.vi
 
-import org.json.JSONArray
 import org.json.JSONObject
 import org.jsoup.nodes.Document
-import org.jsoup.Jsoup
 import org.koitharu.kotatsu.parsers.MangaLoaderContext
 import org.koitharu.kotatsu.parsers.MangaSourceParser
 import org.koitharu.kotatsu.parsers.config.ConfigKey
-import org.koitharu.kotatsu.parsers.core.LegacyPagedMangaParser
+import org.koitharu.kotatsu.parsers.core.PagedMangaParser
 import org.koitharu.kotatsu.parsers.model.*
 import org.koitharu.kotatsu.parsers.util.*
 import org.koitharu.kotatsu.parsers.util.json.*
 import java.text.SimpleDateFormat
 import java.util.*
-import org.koitharu.kotatsu.parsers.Broken
 
-@Broken
 @MangaSourceParser("TRUYENHENTAI18", "TruyenHentai18", "vi", ContentType.HENTAI)
 internal class TruyenHentai18(context: MangaLoaderContext):
-      LegacyPagedMangaParser(context, MangaParserSource.TRUYENHENTAI18, 18) {
+	PagedMangaParser(context, MangaParserSource.TRUYENHENTAI18, 18) {
 
 	override val configKeyDomain = ConfigKey.Domain("truyenhentai18.app")
 
-      private val apiSuffix = "api.th18.app"
-      private val cdnSuffix = "vi-api.th18.app"
+	private val apiSuffix = "api.th18.app"
+	private val cdnSuffix = "vi-api.th18.app"
 
 	override fun onCreateConfig(keys: MutableCollection<ConfigKey<*>>) {
 		super.onCreateConfig(keys)
@@ -32,8 +28,8 @@ internal class TruyenHentai18(context: MangaLoaderContext):
 
 	override val availableSortOrders: Set<SortOrder> = EnumSet.of(
 		SortOrder.UPDATED,
-        	SortOrder.NEWEST,
-        	SortOrder.NEWEST_ASC,
+		SortOrder.NEWEST,
+		SortOrder.NEWEST_ASC,
 	)
 
 	override val filterCapabilities: MangaListFilterCapabilities
@@ -83,11 +79,10 @@ internal class TruyenHentai18(context: MangaLoaderContext):
 			}
 		}
 
-		val fullUrl = "https://" + url
 		return when {
-			filter.tags.isNotEmpty() -> parseNextList(webClient.httpGet(fullUrl).parseHtml())
+			filter.tags.isNotEmpty() -> parseNextList(webClient.httpGet("https://$url").parseHtml())
 			else -> {
-				val doc = webClient.httpGet(fullUrl).parseJson()
+				val doc = webClient.httpGet("https://$url").parseJson()
 				parseJSONList(doc)
 			}
 		}
@@ -126,10 +121,10 @@ internal class TruyenHentai18(context: MangaLoaderContext):
 		}
 	}
 
-	private fun parseNextList(doc: Document): List<Manga> { // need to clean code, very slow response
+	private fun parseNextList(doc: Document): List<Manga> {
 		val script = doc.select("script").firstOrNull { it.data().contains("response") }
 			?: throw Exception("Không tìm thấy script chứa dữ liệu manga")
-		
+
 		val scriptContent = script.data()
 		val cleanedScript = scriptContent
 			.replace("self.__next_f.push([1,", "")
@@ -139,57 +134,25 @@ internal class TruyenHentai18(context: MangaLoaderContext):
 			.replace("\\\\\",", ",")
 			.replace("\\\"", "\"")
 			.replace("\\\\", "\\")
-			.replace("\\n", "")
-			.replace("\\t", "")
-			.replace("\\r", "")
-			
+			.replace("[\\n\\r\\t]", "")
+
 		val responseStart = cleanedScript.indexOf("{\"response\":")
 		if (responseStart == -1) throw Exception("Không tìm thấy object 'response' trong script")
-		
-		var bracketCount = 0
-		var i = responseStart
-		var jsonStr = ""
-		
-		while (i < cleanedScript.length) {
-			val c = cleanedScript[i]
-			when (c) {
-				'{' -> bracketCount++
-				'}' -> bracketCount--
-			}
-			jsonStr += c
-			if (bracketCount == 0 && jsonStr.isNotEmpty()) break
-			i++
-		}
 
+		val jsonStr = extractJsonString(cleanedScript, responseStart)
 		val responseObj = org.json.JSONObject(jsonStr)
 		val dataArray = responseObj.getJSONObject("response").optJSONArray("data")
 			?: throw Exception("Không tìm thấy trường 'data' trong object 'response'")
 
 		return (0 until dataArray.length()).map { idx ->
 			val item = dataArray.getJSONObject(idx)
-			val genres = item.optJSONArray("genres")?.let { genresArray ->
-				(0 until genresArray.length()).mapNotNull { gIdx ->
-					val genreItem = genresArray.optJSONObject(gIdx) ?: return@mapNotNull null
-					MangaTag(
-						key = genreItem.optString("slug"),
-						title = genreItem.optString("name"),
-						source = source
-					)
-				}.toSet()
-			} ?: emptySet()
-
-			val authors = item.optJSONArray("authors")?.let { authorsArray ->
-				(0 until authorsArray.length()).mapNotNull { aIdx ->
-					authorsArray.optJSONObject(aIdx)?.optString("name")
-				}.toSet()
-			} ?: emptySet()
+			val genres = extractGenres(item)
+			val authors = extractAuthors(item)
 
 			Manga(
 				id = item.getLong("id"),
 				title = item.getString("title"),
-				altTitles = setOfNotNull(
-					item.optString("official_name").takeIf { it.isNotBlank() }
-				),
+				altTitles = setOfNotNull(item.optString("official_name").takeIf { it.isNotBlank() }),
 				url = item.getString("slug"),
 				publicUrl = item.getString("slug").toAbsoluteUrl(domain),
 				rating = RATING_UNKNOWN,
@@ -231,41 +194,31 @@ internal class TruyenHentai18(context: MangaLoaderContext):
 			)
 	}
 
-    	override suspend fun getPages(chapter: MangaChapter): List<MangaPage> {
-	        val doc = webClient.httpGet(chapter.url.toAbsoluteUrl(domain)).parseHtml()
-	        val scriptContent = doc.select("script")
-	            .firstOrNull { it.data().startsWith("self.__next_f.push([1,\"\\u003cp\\u003e\\u003c") }
-	            ?.data()
-	
-	        if (scriptContent != null) {
-	            val regex = Regex("""self\.__next_f\.push\(\[1,\"(.*)\"\]\)""")
-	            val htmlEncoded = regex.find(scriptContent)?.groupValues?.getOrNull(1)
-	            if (!htmlEncoded.isNullOrEmpty()) {
-	                val html = try {
-	                    JSONArray("[\"$htmlEncoded\"]").getString(0)
-	                } catch (e: Exception) {
-	                    htmlEncoded
-	                        .replace("\\u003c", "<")
-	                        .replace("\\u003e", ">")
-	                        .replace("\\\"", "\"")
-	                        .replace("\\/", "/")
-	                }
-	
-	                val imageUrls = Jsoup.parse(html).select("img").mapNotNull { it.attr("src") }
-	                if (imageUrls.isNotEmpty()) {
-	                    return imageUrls.map { url ->
-	                        MangaPage(
-	                            id = generateUid(url),
-	                            url = url,
-	                            preview = null,
-	                            source = source,
-	                        )
-	                    }
-	                } else return emptyList()
-	            }
-	        }
-	        return emptyList()
-	    }
+	override suspend fun getPages(chapter: MangaChapter): List<MangaPage> {
+		val doc = webClient.httpGet(chapter.url.toAbsoluteUrl(domain)).parseHtml()
+		val scriptContent = doc.select("script")
+			.firstOrNull { it.data().contains("img src") }
+			?.data()
+			?: return emptyList()
+
+		val decoded = scriptContent
+			.replace("\\u003c", "<")
+			.replace("\\u003e", ">")
+			.replace("\\\"", "\"")
+			.replace("\\/", "/")
+
+		val regex = Regex("""img\s+src=["'](https?://[^"']+)["']""")
+		val imageUrls = regex.findAll(decoded).map { it.groupValues[1] }.toList()
+
+		return imageUrls.map { url ->
+			MangaPage(
+				id = generateUid(url),
+				url = url,
+				preview = null,
+				source = source,
+			)
+		}
+	}
 
 	private fun parseChapterDate(date: String?): Long {
 		if (date == null) return 0
@@ -291,5 +244,43 @@ internal class TruyenHentai18(context: MangaLoaderContext):
 
 			else -> SimpleDateFormat("dd/MM/yyyy", Locale.US).parse(date)?.time ?: 0L
 		}
+	}
+
+	private fun extractJsonString(script: String, responseStart: Int): String {
+		val stringBuilder = StringBuilder()
+		var bracketCount = 0
+		var i = responseStart
+
+		while (i < script.length) {
+			val c = script[i]
+			stringBuilder.append(c)
+			if (c == '{') bracketCount++
+			if (c == '}') bracketCount--
+			if (bracketCount == 0) break
+			i++
+		}
+		return stringBuilder.toString()
+	}
+
+	private fun extractGenres(item: JSONObject): Set<MangaTag> {
+		return item.optJSONArray("genres")?.let { genresArray ->
+			(0 until genresArray.length()).mapNotNull { gIdx ->
+				genresArray.optJSONObject(gIdx)?.let { genreItem ->
+					MangaTag(
+						key = genreItem.optString("slug"),
+						title = genreItem.optString("name"),
+						source = source
+					)
+				}
+			}.toSet()
+		} ?: emptySet()
+	}
+
+	private fun extractAuthors(item: JSONObject): Set<String> {
+		return item.optJSONArray("authors")?.let { authorsArray ->
+			(0 until authorsArray.length()).mapNotNull { aIdx ->
+				authorsArray.optJSONObject(aIdx)?.optString("name")
+			}.toSet()
+		} ?: emptySet()
 	}
 }

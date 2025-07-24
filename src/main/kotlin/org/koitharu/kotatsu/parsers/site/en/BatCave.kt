@@ -5,7 +5,7 @@ import org.koitharu.kotatsu.parsers.Broken
 import org.koitharu.kotatsu.parsers.MangaLoaderContext
 import org.koitharu.kotatsu.parsers.MangaSourceParser
 import org.koitharu.kotatsu.parsers.config.ConfigKey
-import org.koitharu.kotatsu.parsers.core.LegacyPagedMangaParser
+import org.koitharu.kotatsu.parsers.core.PagedMangaParser
 import org.koitharu.kotatsu.parsers.exception.ParseException
 import org.koitharu.kotatsu.parsers.model.*
 import org.koitharu.kotatsu.parsers.util.*
@@ -18,7 +18,7 @@ import java.util.*
 
 @MangaSourceParser("BATCAVE", "BatCave", "en", ContentType.COMICS)
 internal class BatCave(context: MangaLoaderContext) :
-	LegacyPagedMangaParser(context, MangaParserSource.BATCAVE, 20) {
+	PagedMangaParser(context, MangaParserSource.BATCAVE, 20) {
 
 	override val configKeyDomain = ConfigKey.Domain("batcave.biz")
 
@@ -106,9 +106,16 @@ internal class BatCave(context: MangaLoaderContext) :
 		val dateFormat = SimpleDateFormat("dd.MM.yyyy", Locale.US)
 
 		val scriptData = doc.selectFirst("script:containsData(__DATA__)")?.data()
-			?.substringAfter("window.__DATA__ = ")
-			?.substringBefore(";")
-			?: doc.parseFailed("Script data not found")
+			?.let { data ->
+				val jsonStart = data.indexOf("window.__DATA__ = ") + "window.__DATA__ = ".length
+				val jsonEnd = data.indexOf("};", startIndex = jsonStart)
+				if (jsonEnd != -1) {
+					// substring, include "}" symbol
+					data.substring(jsonStart, jsonEnd + 1)
+				} else {
+					null
+				}
+			} ?: doc.parseFailed("Script data not found")
 
 		val jsonData = JSONObject(scriptData)
 		val newsId = jsonData.getLong("news_id")

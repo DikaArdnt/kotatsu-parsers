@@ -4,7 +4,7 @@ import androidx.collection.arraySetOf
 import org.koitharu.kotatsu.parsers.MangaLoaderContext
 import org.koitharu.kotatsu.parsers.MangaSourceParser
 import org.koitharu.kotatsu.parsers.config.ConfigKey
-import org.koitharu.kotatsu.parsers.core.LegacyPagedMangaParser
+import org.koitharu.kotatsu.parsers.core.PagedMangaParser
 import org.koitharu.kotatsu.parsers.model.*
 import org.koitharu.kotatsu.parsers.network.UserAgents
 import org.koitharu.kotatsu.parsers.util.*
@@ -13,9 +13,9 @@ import java.util.*
 
 @MangaSourceParser("GOCTRUYENTRANH", "Góc Truyện Tranh", "vi")
 internal class GocTruyenTranh(context: MangaLoaderContext) :
-	LegacyPagedMangaParser(context, MangaParserSource.GOCTRUYENTRANH, 30) {
+	PagedMangaParser(context, MangaParserSource.GOCTRUYENTRANH, 30) {
 
-	override val configKeyDomain = ConfigKey.Domain("goctruyentranh.net")
+	override val configKeyDomain = ConfigKey.Domain("goctruyentranh.org")
 
 	override fun onCreateConfig(keys: MutableCollection<ConfigKey<*>>) {
 		super.onCreateConfig(keys)

@@ -13,7 +13,7 @@ import org.koitharu.kotatsu.parsers.MangaSourceParser
 import org.koitharu.kotatsu.parsers.bitmap.Bitmap
 import org.koitharu.kotatsu.parsers.bitmap.Rect
 import org.koitharu.kotatsu.parsers.config.ConfigKey
-import org.koitharu.kotatsu.parsers.core.LegacyPagedMangaParser
+import org.koitharu.kotatsu.parsers.core.PagedMangaParser
 import org.koitharu.kotatsu.parsers.model.*
 import org.koitharu.kotatsu.parsers.network.UserAgents
 import org.koitharu.kotatsu.parsers.util.*
@@ -24,7 +24,7 @@ import java.util.*
 
 @MangaSourceParser("CUUTRUYEN", "Cứu Truyện", "vi")
 internal class CuuTruyenParser(context: MangaLoaderContext) :
-	LegacyPagedMangaParser(context, MangaParserSource.CUUTRUYEN, 20) {
+	PagedMangaParser(context, MangaParserSource.CUUTRUYEN, 20) {
 
 	override val userAgentKey = ConfigKey.UserAgent(UserAgents.KOTATSU)
 
@@ -132,7 +132,7 @@ internal class CuuTruyenParser(context: MangaLoaderContext) :
 			Manga(
 				id = generateUid(jo.getLong("id")),
 				url = "/api/v2/mangas/${jo.getLong("id")}",
-				publicUrl = "https://$domain/manga/${jo.getLong("id")}",
+				publicUrl = "https://$domain/mangas/${jo.getLong("id")}",
 				title = jo.getString("name"),
 				altTitles = emptySet(),
 				coverUrl = jo.getString("cover_mobile_url"),
@@ -178,7 +178,7 @@ internal class CuuTruyenParser(context: MangaLoaderContext) :
 		manga.copy(
 			title = title,
 			altTitles = json.optJSONArray("titles")?.mapJSONToSet { it.getString("name") }?.minus(title).orEmpty(),
-			contentRating = if (json.getBooleanOrDefault("is_nsfw", manga.isNsfw)) {
+			contentRating = if (json.getBooleanOrDefault("is_nsfw", false)) {
 				ContentRating.ADULT
 			} else {
 				ContentRating.SAFE

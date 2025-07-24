@@ -3,13 +3,13 @@ package org.koitharu.kotatsu.parsers.site.vi
 import org.koitharu.kotatsu.parsers.MangaLoaderContext
 import org.koitharu.kotatsu.parsers.MangaSourceParser
 import org.koitharu.kotatsu.parsers.config.ConfigKey
-import org.koitharu.kotatsu.parsers.core.LegacyPagedMangaParser
+import org.koitharu.kotatsu.parsers.core.PagedMangaParser
 import org.koitharu.kotatsu.parsers.model.*
 import org.koitharu.kotatsu.parsers.util.*
 import java.util.*
 
-@MangaSourceParser("KURONEKO", "Việt Hentai - Kuro Neko", "vi", type = ContentType.HENTAI)
-internal class KuroNeko(context: MangaLoaderContext) : LegacyPagedMangaParser(context, MangaParserSource.KURONEKO, 60) {
+@MangaSourceParser("KURONEKO", "Kuro Neko / vi-Hentai", "vi", type = ContentType.HENTAI)
+internal class KuroNeko(context: MangaLoaderContext) : PagedMangaParser(context, MangaParserSource.KURONEKO, 60) {
 
 	override val configKeyDomain = ConfigKey.Domain("vi-hentai.moe")
 
@@ -209,11 +209,14 @@ internal class KuroNeko(context: MangaLoaderContext) : LegacyPagedMangaParser(co
 	}
 
 	private suspend fun availableTags(): Set<MangaTag> {
-		val doc = webClient.httpGet("https://$domain").parseHtml()
-		return doc.select("ul.grid.grid-cols-2 a").mapIndexed { index, a ->
+		val doc = webClient.httpGet("https://$domain/tim-kiem").parseHtml()
+		val regex = Regex("toggleGenre\\('([0-9]+)'\\)")
+		return doc.select("div.grid.grid-cols-3 label").mapNotNullToSet { label ->
+			val attr = label.attr("@click")
+			val number = attr.findGroupValue(regex) ?: return@mapNotNullToSet null
 			MangaTag(
-				key = (index + 1).toString(),
-				title = a.text(),
+				key = number,
+				title = label.text(),
 				source = source,
 			)
 		}.toSet()
