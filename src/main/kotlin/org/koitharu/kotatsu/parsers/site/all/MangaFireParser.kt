@@ -81,7 +81,13 @@ internal abstract class MangaFireParser(
 
 	override suspend fun getFilterOptions() = MangaListFilterOptions(
 		availableTags = tags.get().values.toSet(),
-		availableStates = EnumSet.allOf(MangaState::class.java),
+		availableStates = EnumSet.of(
+			MangaState.ONGOING,
+			MangaState.FINISHED,
+			MangaState.ABANDONED,
+			MangaState.PAUSED,
+			MangaState.UPCOMING,
+		),
 	)
 
 	override suspend fun getListPage(page: Int, order: SortOrder, filter: MangaListFilter): List<Manga> {
@@ -128,6 +134,7 @@ internal abstract class MangaFireParser(
 								MangaState.ABANDONED -> "discontinued"
 								MangaState.PAUSED -> "on_hiatus"
 								MangaState.UPCOMING -> "info"
+								else -> throw IllegalArgumentException("$state not supported")
 							},
 						)
 					}
@@ -288,7 +295,7 @@ internal abstract class MangaFireParser(
 				},
 				url = "${branch.type}/${it.attr("data-id")}",
 				scanlator = null,
-				uploadDate = dateFormat.tryParse(it.attr("upload-date")),
+				uploadDate = dateFormat.parseSafe(it.attr("upload-date")),
 				branch = "${branch.langTitle} ${branch.type.toTitleCase()}",
 				source = source,
 			)

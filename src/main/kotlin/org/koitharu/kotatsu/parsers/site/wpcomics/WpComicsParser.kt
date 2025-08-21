@@ -27,7 +27,7 @@ internal abstract class WpComicsParser(
 ) : PagedMangaParser(context, source, pageSize) {
 
 	companion object {
-		const val netDomain = "nettruyen1975.com"
+		const val GLOBAL_NETTRUYEN_DOMAIN = "nettruyen1905.com"
 	}
 
 	override val configKeyDomain = ConfigKey.Domain(domain)
@@ -310,9 +310,9 @@ internal abstract class WpComicsParser(
 				} else {
 					it
 				}
-			}.let { dateFormat.tryParse(it.joinToString(" ")) }
+			}.let { dateFormat.parseSafe(it.joinToString(" ")) }
 
-			else -> dateFormat.tryParse(date)
+			else -> dateFormat.parseSafe(date)
 		}
 	}
 

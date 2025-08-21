@@ -25,6 +25,18 @@ internal abstract class OtakuSanctuaryParser(
 		keys.add(userAgentKey)
 	}
 
+	override suspend fun getFavicons(): Favicons {
+		return Favicons(
+			listOf(
+				Favicon(
+					"https://raw.githubusercontent.com/dragonx943/listcaidaubuoi/refs/heads/main/logo_square.png",
+					200,
+					null),
+			),
+			domain,
+		)
+	}
+
 	override val availableSortOrders: Set<SortOrder> = EnumSet.of(
 		SortOrder.UPDATED,
 		SortOrder.NEWEST,
@@ -251,7 +263,7 @@ internal abstract class OtakuSanctuaryParser(
 				parseRelativeDate(d)
 			}
 
-			else -> dateFormat.tryParse(date)
+			else -> dateFormat.parseSafe(date)
 		}
 	}
 

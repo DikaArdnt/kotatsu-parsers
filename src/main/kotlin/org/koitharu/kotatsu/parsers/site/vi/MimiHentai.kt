@@ -5,6 +5,7 @@ import org.koitharu.kotatsu.parsers.MangaLoaderContext
 import org.koitharu.kotatsu.parsers.MangaSourceParser
 import org.koitharu.kotatsu.parsers.config.ConfigKey
 import org.koitharu.kotatsu.parsers.core.PagedMangaParser
+import org.koitharu.kotatsu.parsers.network.UserAgents
 import org.koitharu.kotatsu.parsers.model.*
 import org.koitharu.kotatsu.parsers.util.*
 import org.koitharu.kotatsu.parsers.util.json.*
@@ -17,6 +18,19 @@ internal class MimiHentai(context: MangaLoaderContext) :
 
 	private val apiSuffix = "api/v1/manga"
 	override val configKeyDomain = ConfigKey.Domain("mimihentai.com", "hentaihvn.com")
+	override val userAgentKey = ConfigKey.UserAgent(UserAgents.KOTATSU)
+
+	override suspend fun getFavicons(): Favicons {
+		return Favicons(
+			listOf(
+				Favicon(
+					"https://raw.githubusercontent.com/dragonx943/plugin-sdk/refs/heads/sources/mimihentai/app/src/main/ic_launcher-playstore.png",
+					512,
+					null),
+			),
+			domain,
+		)
+	}
 
 	private val preferredServerKey = ConfigKey.PreferredImageServer(
 		presetValues = mapOf(
@@ -32,6 +46,7 @@ internal class MimiHentai(context: MangaLoaderContext) :
 	override fun onCreateConfig(keys: MutableCollection<ConfigKey<*>>) {
 		super.onCreateConfig(keys)
 		keys.add(preferredServerKey)
+		keys.remove(userAgentKey)
 	}
 
 	override val availableSortOrders: Set<SortOrder> = EnumSet.of(
@@ -40,7 +55,7 @@ internal class MimiHentai(context: MangaLoaderContext) :
         	SortOrder.POPULARITY,
         	SortOrder.POPULARITY_TODAY,
 			SortOrder.POPULARITY_WEEK,
-        	SortOrder.POPULARITY_MONTH,
+			SortOrder.POPULARITY_MONTH,
         	SortOrder.RATING,
     )
 
@@ -62,44 +77,45 @@ internal class MimiHentai(context: MangaLoaderContext) :
 	override suspend fun getListPage(page: Int, order: SortOrder, filter: MangaListFilter): List<Manga> {
     	val url = buildString {
             append("https://")
-            append(domain + "/" + apiSuffix)
+            append("$domain/$apiSuffix")
                 
-            if (!filter.query.isNullOrEmpty() || !filter.author.isNullOrEmpty() || filter.tags.isNotEmpty()) {
+            if (!filter.query.isNullOrEmpty() ||
+				!filter.author.isNullOrEmpty() ||
+				filter.tags.isNotEmpty()
+			) {
                 append("/advance-search?page=")
                 append(page)
                 append("&max=18") // page size, avoid rate limit
-                                
-                when {
-                	!filter.query.isNullOrEmpty() -> {
-                    	append("&name=")
-                        append(filter.query.urlEncoded())
-                    }
 
-                    !filter.author.isNullOrEmpty() -> {
-                        append("&author=")
-                        append(filter.author.urlEncoded())
-                    }
+				if (!filter.query.isNullOrEmpty()) {
+					append("&name=")
+					append(filter.query.urlEncoded())
+				}
 
-                    filter.tags.isNotEmpty() -> {
-                        append("&genre=")
-                        append(filter.tags.joinToString(",") { it.key })
-                    }
+                if (!filter.author.isNullOrEmpty()) {
+                    append("&author=")
+                    append(filter.author.urlEncoded())
+				}
 
-			  		filter.tagsExclude.isNotEmpty() -> {
-						append("&ex=")
-						append(filter.tagsExclude.joinToString(",") { it.key })
-			  		}
-                }
+                if (filter.tags.isNotEmpty()) {
+                    append("&genre=")
+                    append(filter.tags.joinToString(",") { it.key })
+				}
+
+				if (filter.tagsExclude.isNotEmpty()) {
+					append("&ex=")
+					append(filter.tagsExclude.joinToString(",") { it.key })
+				}
                                 
                 append("&sort=")
                 append(
                     when (order) {
                         SortOrder.UPDATED -> "updated_at"
                         SortOrder.ALPHABETICAL -> "title"
-                        SortOrder.POPULARITY, 
-                        SortOrder.POPULARITY_TODAY, 
-                        SortOrder.POPULARITY_WEEK, 
-                        SortOrder.POPULARITY_MONTH -> "views"
+                        SortOrder.POPULARITY -> "follows"
+                        SortOrder.POPULARITY_TODAY,
+                        SortOrder.POPULARITY_WEEK,
+						SortOrder.POPULARITY_MONTH -> "views"
                         SortOrder.RATING -> "likes"
                         else -> ""
                     }
@@ -111,10 +127,10 @@ internal class MimiHentai(context: MangaLoaderContext) :
                     when (order) {
                         SortOrder.UPDATED -> "/tatcatruyen?page=$page&sort=updated_at"
                         SortOrder.ALPHABETICAL -> "/tatcatruyen?page=$page&sort=title"
-                        SortOrder.POPULARITY -> "/tatcatruyen?page=$page&sort=views"
-                        SortOrder.POPULARITY_TODAY -> "/top-manga?page=$page&timeType=1&limit=18"
-                        SortOrder.POPULARITY_WEEK -> "/top-manga?page=$page&timeType=2&limit=18"
-                        SortOrder.POPULARITY_MONTH -> "/top-manga?page=$page&timeType=3&limit=18"
+                        SortOrder.POPULARITY -> "/tatcatruyen?page=$page&sort=follows"
+                        SortOrder.POPULARITY_TODAY -> "/tatcatruyen?page=$page&sort=views"
+                        SortOrder.POPULARITY_WEEK -> "/top-manga?page=$page&timeType=1&limit=18"
+						SortOrder.POPULARITY_MONTH -> "/top-manga?page=$page&timeType=2&limit=18"
                         SortOrder.RATING -> "/tatcatruyen?page=$page&sort=likes"
                         else -> "/tatcatruyen?page=$page&sort=updated_at" // default
                     }

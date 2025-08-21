@@ -47,7 +47,13 @@ internal abstract class NepnepParser(
 
 	override suspend fun getFilterOptions() = MangaListFilterOptions(
 		availableTags = fetchAvailableTags(),
-		availableStates = EnumSet.allOf(MangaState::class.java),
+		availableStates = EnumSet.of(
+			MangaState.ONGOING,
+			MangaState.FINISHED,
+			MangaState.ABANDONED,
+			MangaState.PAUSED,
+			MangaState.UPCOMING,
+		),
 	)
 
 	data class MangaWithLastUpdate(
@@ -230,7 +236,7 @@ internal abstract class NepnepParser(
 					volume = 0,
 					url = url,
 					scanlator = null,
-					uploadDate = dateFormat.tryParse(date),
+					uploadDate = dateFormat.parseSafe(date),
 					branch = null,
 					source = source,
 				)
